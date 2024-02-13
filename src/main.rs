@@ -8,12 +8,12 @@ use serde::{Deserialize,Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
-use warp::{filters::body, reject, reply, Filter, Rejection, Reply};
+use warp::{reject, reply, Filter, Rejection, Reply};
 
 
 type Result<T>  = std::result::Result<T,error::Error>;
 type WebResult<T> = std::result::Result<T, Rejection>;
-type User = Arc<HashMap<String, User>>;
+type Users = Arc<HashMap<String, User>>;
 
 
 #[derive(Clone)]
@@ -55,21 +55,62 @@ async fn main() {
 
     let routes = login_route
         .or(user_route)
-        .or(user_route)
-        .and(admin_route)
+        .or(admin_route)
         .recover(error::handle_rejection);
 
-    warp::serve(routes).run(([127.0.0.1], 8000)).await;
+    warp::serve(routes).run(([127,0,0,1], 8000)).await;
 }
 
-fn with_users (users: User) -> impl Filter<Extract = (User,), Error = Infallible> + Clone{
+fn with_users (users: Users) -> impl Filter<Extract = (Users,), Error = Infallible> + Clone{
     warp::any().map(move || users.clone())
 }
 
-pub async fn login_handler(users: User, body: Login Request)-> WebResult<impl Reply> {
+pub async fn login_handler(users: Users, body: LoginRequest)-> WebResult<impl Reply> {
     match users
         .iter()
-        .find(|_uid,user|user.email == body.email && user.pw == body.pw)
+        .find(|(_uid,user)| user.email == body.email && user.pw == body.pw)
+
+        {
+            Some((uid, user)) =>{
+                let token = auth::create_jwt(&uid, &Role::from_str(&user.role))
+                    .map_err(|e| reject::custom(e))?;
+                Ok(reply::json(&LoginResponse{token}))
+
+            }
+            None => Err(reject::custom(WrongCredentialsError)),
+        }
 }
 
-//33.22
+
+pub async fn user_handler (uid: String) -> WebResult<impl Reply> {
+    Ok(format!("Hello Users {}", uid))
+}
+
+pub async fn admin_handler (uid: String) -> WebResult<impl Reply> {
+    Ok(format!("Hello Admin {}", uid))
+}
+
+
+fn init_users() -> HashMap<String, User> {
+    let mut map = HashMap::new();
+    map.insert(
+        String::from("1"),
+        User{
+            uid: String::from("1"),
+            email: String::from("user@userland.com"),
+            pw: String::from("1234"),
+            role: String::from("User"),
+        },
+    );
+
+    map.insert(
+        String::from("2"),
+        User{
+            uid: String::from("2"),
+            email: String::from("admin@adminland.com"),
+            pw: String::from("4321"),
+            role: String::from("Admin"),
+        },
+    );
+    map
+}

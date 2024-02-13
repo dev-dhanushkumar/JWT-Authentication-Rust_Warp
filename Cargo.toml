@@ -4,6 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chrono = "0.4.34"
+jsonwebtoken = "9.2.0"
 serde = {version = "1.0.196", features = ["derive"]}
+thiserror = "1.0.57"
 tokio = {version = "1.36.0", features = ["full"]}
 warp =  "0.3.6"
+
+
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
+
+[profile.release]
+panic = 'abort'
